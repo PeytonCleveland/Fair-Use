@@ -29,7 +29,11 @@ The Darwin-JSTS Project is a collection of scripts and data related to evolution
 
 ## Usage
 
-Execute the main script: python main.py seed_topics.csv output.csv --epochs 2
+Execute the main script:
+
+```
+python main.py seed_topics.csv output.csv --epochs 2
+```
 
 For specific functionalities or options, provide further details and instructions.
 
