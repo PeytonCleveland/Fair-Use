@@ -12,12 +12,12 @@ import re
 # Functions
 def clean_text(text):
     text = text.replace("�", " ")
-    text = text.replace('\f', '')
-    text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
-    text = re.sub(r'_+', ' ', text)
-    text = re.sub(r'\b\d{1,4}\b', '', text)
-    text = re.sub(r'http\S+', '', text)
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
+    text = re.sub(r'http\S+', ' ', text)
+    # text = text.replace('\f', '')
+    # text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
+    # text = re.sub(r'_+', ' ', text)
+    # text = re.sub(r'\b\d{1,4}\b', '', text)
 
     return text.strip()
 
@@ -43,24 +43,24 @@ def extract_text_from_pdf(pdf_path, output_path):
 
     with open(output_path, "wb") as out:
         for page in doc:
+            # Process to text with PyMuPdf
             text = page.get_text()
+            # Apply cleaning regex
             cleaned_text = clean_text(text)
-
             # Remove copyright paragraphs
             cleaned_text = remove_copyright_paragraphs(cleaned_text)
-            # cleaned_text = remove_copyright_paragraphs(text)
 
             out.write(cleaned_text.encode("utf8"))
-            # Adds a form feed byte as separator for each page (optional, if you still want this)
-            out.write(bytes((12,)))
+            # Adding marker for page identification / separation
+            out.write(b'\n#=================#\n')   # because seventeen "=" are easy to find
     doc.close()
 
 
 #======================================
 def main():
     # Define your input PDF path and output text path here
-    pdf_input_path = r"C:\Users\david\Documents\TestDocs"
-    text_output_path = r"C:\Users\david\Documents\TextOut"
+    pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In"
+    text_output_path = r"C:\Users\david\Documents\WorkingDir\Out"
 
     # Ensure the output directory exists
     output_dir = os.path.dirname(text_output_path)
