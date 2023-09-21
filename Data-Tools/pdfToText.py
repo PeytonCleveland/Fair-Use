@@ -13,7 +13,8 @@ import re
 def clean_text(text):
     text = text.replace("�", " ")
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
-    text = re.sub(r'http\S+', ' ', text)
+    text = re.sub(r'http\S+', ' ', text)                        # urls
+    text = re.sub(r'(\(\d{3}\))?\s\d{3}-\d{4}', ' ', text)      # phone numbers
     # text = text.replace('\f', '')
     # text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
     # text = re.sub(r'_+', ' ', text)
@@ -45,21 +46,22 @@ def extract_text_from_pdf(pdf_path, output_path):
         for page in doc:
             # Process to text with PyMuPdf
             text = page.get_text()
+            # Adding marker for page identification / separation
+            out.write(b'\n#=================#\n')   # because seventeen "=" are easy to find
             # Apply cleaning regex
             cleaned_text = clean_text(text)
             # Remove copyright paragraphs
             cleaned_text = remove_copyright_paragraphs(cleaned_text)
 
             out.write(cleaned_text.encode("utf8"))
-            # Adding marker for page identification / separation
-            out.write(b'\n#=================#\n')   # because seventeen "=" are easy to find
     doc.close()
 
 
 #======================================
 def main():
     # Define your input PDF path and output text path here
-    pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In"
+    # pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In"
+    pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In\Docs"
     text_output_path = r"C:\Users\david\Documents\WorkingDir\Out"
 
     # Ensure the output directory exists
