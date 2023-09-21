@@ -1,9 +1,11 @@
-import fitz
 import os
+import pandas as pd
+import fitz
 import re
 from docx import Document
 from win32com import client as win32client  # For DOC extraction
 from ebooklib import epub  # For EPUB extraction
+from subprocess import run
 
 
 # ======================================
@@ -19,6 +21,7 @@ def clean_text(text):
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
     text = re.sub(
         r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', '', text)
+    text = re.sub(r'\d{3}-\d{2}-\d{4}', 'XXX-XX-XXXX', text)
 
     # Remove any excess spaces
     # text = re.sub(r'\s{2,}', ' ', text)
@@ -117,6 +120,13 @@ def extract_text_from_epub(epub_path, output_path):
         out.write(cleaned_text)
 
 
+def transform_with_ocr(input_filename):
+    """Transforms a single file with OCR."""
+    print("Converting with OCR : " + os.path.basename(input_filename))
+    output_filename = input_filename  # Overwrite the same file
+    run(['ocrmypdf', '--force-ocr', input_filename, output_filename])
+
+
 # ======================================
 def main():
     # Define your input path and output text path here
@@ -135,23 +145,31 @@ def main():
         out_file = file['file_name']
 
         if out_file.endswith('.pdf'):
-            out_file = out_file.replace('.pdf', '.txt')
-            output_text_path = os.path.join(output_path, out_file)
+            out_file_txt = out_file.replace('.pdf', '.txt')
+            output_text_path = os.path.join(output_path, out_file_txt)
             extract_text_from_pdf(input_file_path, output_text_path)
+
+            # Checking word count and decide if to process with OCR
+            with open(output_text_path, 'r', encoding="utf-8") as f:
+                word_count = len(f.read().split())
+                if word_count < 100:
+                    transform_with_ocr(input_file_path)
+                    # Now, extract text again from the OCR processed PDF
+                    extract_text_from_pdf(input_file_path, output_text_path)
+
         elif out_file.endswith('.docx'):
-            out_file = out_file.replace('.docx', '.txt')
-            output_text_path = os.path.join(output_path, out_file)
+            out_file_txt = out_file.replace('.docx', '.txt')
+            output_text_path = os.path.join(output_path, out_file_txt)
             extract_text_from_word(input_file_path, output_text_path)
         elif out_file.endswith('.doc'):
-            out_file = out_file.replace('.doc', '.txt')
-            output_text_path = os.path.join(output_path, out_file)
+            out_file_txt = out_file.replace('.doc', '.txt')
+            output_text_path = os.path.join(output_path, out_file_txt)
             extract_text_from_doc(input_file_path, output_text_path)
         elif out_file.endswith('.txt'):
-            # No extraction needed, just copying the text file to output directory
             os.copy(input_file_path, os.path.join(output_path, out_file))
         elif out_file.endswith('.epub'):
-            out_file = out_file.replace('.epub', '.txt')
-            output_text_path = os.path.join(output_path, out_file)
+            out_file_txt = out_file.replace('.epub', '.txt')
+            output_text_path = os.path.join(output_path, out_file_txt)
             extract_text_from_epub(input_file_path, output_text_path)
 
 
