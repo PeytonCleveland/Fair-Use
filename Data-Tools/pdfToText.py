@@ -14,7 +14,7 @@ def clean_text(text):
     text = text.replace("�", " ")
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
     text = re.sub(r'http\S+', ' ', text)                        # urls
-    text = re.sub(r'(\(\d{3}\))?\s\d{3}-\d{4}', ' ', text)      # phone numbers
+    text = re.sub(r'(\(?\d{3}\)?)?[\s|-]?\d{3}-\d{4}', ' ', text)      # phone numbers
     # text = text.replace('\f', '')
     # text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
     # text = re.sub(r'_+', ' ', text)
@@ -61,7 +61,7 @@ def extract_text_from_pdf(pdf_path, output_path):
 def main():
     # Define your input PDF path and output text path here
     # pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In"
-    pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In\Docs"
+    pdf_input_path = r"C:\Users\david\Documents\WorkingDir\In"
     text_output_path = r"C:\Users\david\Documents\WorkingDir\Out"
 
     # Ensure the output directory exists
