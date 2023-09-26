@@ -59,15 +59,17 @@ def chunk_text(text, chunk_size=1500):
 def get_context(previous_response):
     # Request a one-sentence summary from GPT-3.5-Turbo
     prompt = f"Summarize the following text in one sentence: {previous_response}"
-    summary = get_response(prompt, context="")
+
+    summary = get_response(prompt, context="", max_length=200)
+
     return summary
 
 
-def get_response(chunk, context="", max_length=1500):
-    system_prompt = f"""You are working with content from a textbook. Given the context: '{context}', your task is to 
-    improve the following content, ensuring you retain its original meaning, technicality, and accuracy. If you notice missing information
-    or errors, fill in the gaps or correct them. If the content appears to be a bibliography, introduction, copyright notice, 
-    or other non-essential sections, replace it with '//*REMOVED*//'. Here's the content:
+def get_response(chunk, context="", max_length=2500):
+    system_prompt = f"""You are a technical writer simply transposing content from a textbook. Given the context: '{context}', your task is to 
+    rewrite and improve the following content, ensuring you rewrite all its original meaning and technicality, paying attention to accuracy. If you notice missing information
+    or errors, fill in the gaps or correct them. * it is critical however, that if the content appears to be a bibliography, introduction, copyright notice, gibberish,
+    or other non-essential sections, replace it with '//*REMOVED*//'*. Here's the content:
     {chunk}
     """
     try:
@@ -105,10 +107,10 @@ def load_checkpoint():
 
 if __name__ == "__main__":
     # Define the directory where the textbooks are stored
-    directory_path = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess.test\Import_text'
+    directory_path = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess\Import_text'
 
     # Define a directory where the processed textbooks will be saved
-    export_directory = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess.test\Export_text'
+    export_directory = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess\Export_text'
     if not os.path.exists(export_directory):
         # Create the directory if it doesn't exist
         os.makedirs(export_directory)

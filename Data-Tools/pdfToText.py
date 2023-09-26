@@ -123,8 +123,24 @@ def extract_text_from_epub(epub_path, output_path):
 def transform_with_ocr(input_filename):
     """Transforms a single file with OCR."""
     print("Converting with OCR : " + os.path.basename(input_filename))
-    output_filename = input_filename  # Overwrite the same file
+
+    # Extract the file name without extension and the directory
+    file_dir = os.path.dirname(input_filename)
+    file_name_no_ext = os.path.splitext(os.path.basename(input_filename))[0]
+
+    # Define the output filename
+    output_filename = os.path.join(
+        file_dir, file_name_no_ext + " OCR processed.pdf")
+
+    # Check if the output file already exists, if so, append a timestamp or number
+    if os.path.exists(output_filename):
+        import time
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_filename = os.path.join(
+            file_dir, file_name_no_ext + f" OCR processed {timestamp}.pdf")
+
     run(['ocrmypdf', '--force-ocr', input_filename, output_filename])
+    return output_filename
 
 
 # ======================================
@@ -152,10 +168,16 @@ def main():
             # Checking word count and decide if to process with OCR
             with open(output_text_path, 'r', encoding="utf-8") as f:
                 word_count = len(f.read().split())
-                if word_count < 100:
-                    transform_with_ocr(input_file_path)
-                    # Now, extract text again from the OCR processed PDF
-                    extract_text_from_pdf(input_file_path, output_text_path)
+
+            # Close the file explicitly, if not using a with statement
+            f.close()
+
+            if word_count < 100:
+                ocr_processed_file = transform_with_ocr(input_file_path)
+                # Delete the initial output text file
+                if os.path.exists(output_text_path):
+                    os.remove(output_text_path)
+                extract_text_from_pdf(ocr_processed_file, output_text_path)
 
         elif out_file.endswith('.docx'):
             out_file_txt = out_file.replace('.docx', '.txt')
