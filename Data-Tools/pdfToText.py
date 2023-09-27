@@ -14,11 +14,8 @@ def clean_text(text):
     text = text.replace("�", " ")
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
     text = re.sub(r'http\S+', ' ', text)                        # urls
-    text = re.sub(r'(\(?\d{3}\)?)?[\s|-]?\d{3}-\d{4}', ' ', text)      # phone numbers
-    # text = text.replace('\f', '')
-    # text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
-    # text = re.sub(r'_+', ' ', text)
-    # text = re.sub(r'\b\d{1,4}\b', '', text)
+    text = re.sub(r'(\(?\d{3}\)?)?[\s|-]?\d{3}-\d{4}', ' XXX-XXX-XXXX ', text)      # phone numbers
+    text = re.sub('[\u00B9\|\u00B2\|\u00B3\|\u2074\|\u2075\|\u2076\|\u2077\|\u2078\|\u2079|\u2070]', '', text) # superscript 0-9
 
     return text.strip()
 
