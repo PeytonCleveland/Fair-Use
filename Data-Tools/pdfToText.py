@@ -2,11 +2,11 @@ import os
 import pandas as pd
 import fitz
 import re
-from docx import Document
-from win32com import client as win32client  # For DOC extraction
-from ebooklib import epub  # For EPUB extraction
+import docx2txt
+from ebooklib import epub
 from subprocess import run
 import boto3
+import json
 
 
 # ======================================
@@ -106,17 +106,13 @@ def extract_text_from_doc(doc_path, output_path):
         return
 
     try:
-        word_app = win32client.Dispatch('Word.Application')
-        doc = word_app.Documents.Open(doc_path)
-        text = doc.Content.Text
+        # Using docx2txt to extract text
+        text = docx2txt.process(doc_path)
         cleaned_text = clean_text(text)
         with open(output_path, "w", encoding="utf-8") as out:
             out.write(cleaned_text)
-        doc.Close()
-        word_app.Quit()
     except Exception as e:
         print(f"Failed to process {os.path.basename(doc_path)}: {e}")
-        return
 
 
 def extract_text_from_epub(epub_path, output_path):
