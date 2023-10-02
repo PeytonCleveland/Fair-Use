@@ -6,10 +6,42 @@ from docx import Document
 from win32com import client as win32client  # For DOC extraction
 from ebooklib import epub  # For EPUB extraction
 from subprocess import run
+import boto3
+
+
+# ======================================
+# S3 Functions
+# ======================================
+
+s3 = boto3.client('s3', region_name='us-gov-west-1')
+
+BUCKET_NAME = "ocelot-data-input"
+IMPORT_SUBFOLDER = "Import"
+EXPORT_SUBFOLDER = "Export"
+
+
+def read_from_s3(file_key):
+    """Reads a file from S3 given its key."""
+    obj = s3.get_object(Bucket=BUCKET_NAME, Key=file_key)
+    content = obj['Body'].read().decode('utf-8')
+    return content
+
+
+def save_to_s3(data, file_key):
+    """Writes data to an S3 file given its key."""
+    s3.put_object(Body=data, Bucket=BUCKET_NAME, Key=file_key)
+
+
+def list_files_in_s3_subfolder(subfolder_name):
+    """Lists all files in a specific S3 subfolder."""
+    response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=subfolder_name)
+    return [item['Key'] for item in response.get('Contents', [])]
 
 
 # ======================================
 # Functions
+# ======================================
+
 
 def clean_text(text):
     text = text.replace("�", " ")
@@ -143,56 +175,74 @@ def transform_with_ocr(input_filename):
     return output_filename
 
 
+def lambda_handler(event, context):
+    try:
+        main()
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Text extraction completed successfully!')
+        }
+    except Exception as e:
+        print(f"Error: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps(f"Failed due to: {str(e)}")
+        }
+
 # ======================================
+# Main
+# ======================================
+
+
 def main():
-    # Define your input path and output text path here
-    input_path = r"C:\Users\Deft\Desktop\Devlopment\pdf to text\Datafolder"
-    output_path = r"C:\Users\Deft\Desktop\Devlopment\pdf to text\Dataoutputfolder"
+    # Get the list of all files in the IMPORT_SUBFOLDER on S3
+    file_collection = list_files_in_s3_subfolder(IMPORT_SUBFOLDER)
 
-    # Ensure the output directory exists
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
+    for file_key in file_collection:
+        # For simplicity, considering only the file's name (excluding the folder)
+        file_name = file_key.split('/')[-1]
+        out_file = file_name
 
-    file_collection = collect_files(
-        input_path, ['.pdf', '.docx', '.doc', '.txt', '.epub'])
-
-    for file in file_collection:
-        input_file_path = file['full_name']
-        out_file = file['file_name']
+        # Use the read_from_s3 function to read file content
+        file_content = read_from_s3(file_key)
 
         if out_file.endswith('.pdf'):
             out_file_txt = out_file.replace('.pdf', '.txt')
-            output_text_path = os.path.join(output_path, out_file_txt)
-            extract_text_from_pdf(input_file_path, output_text_path)
+            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
+            extracted_text = extract_text_from_pdf(file_content)
 
             # Checking word count and decide if to process with OCR
-            with open(output_text_path, 'r', encoding="utf-8") as f:
-                word_count = len(f.read().split())
-
-            # Close the file explicitly, if not using a with statement
-            f.close()
+            word_count = len(extracted_text.split())
 
             if word_count < 100:
-                ocr_processed_file = transform_with_ocr(input_file_path)
-                # Delete the initial output text file
-                if os.path.exists(output_text_path):
-                    os.remove(output_text_path)
-                extract_text_from_pdf(ocr_processed_file, output_text_path)
+                ocr_processed_file_content = transform_with_ocr(file_content)
+                extracted_text = extract_text_from_pdf(
+                    ocr_processed_file_content)
+
+            # Use save_to_s3 function to write back to S3
+            save_to_s3(extracted_text, output_text_key)
 
         elif out_file.endswith('.docx'):
             out_file_txt = out_file.replace('.docx', '.txt')
-            output_text_path = os.path.join(output_path, out_file_txt)
-            extract_text_from_word(input_file_path, output_text_path)
+            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
+            extracted_text = extract_text_from_word(file_content)
+            save_to_s3(extracted_text, output_text_key)
+
         elif out_file.endswith('.doc'):
             out_file_txt = out_file.replace('.doc', '.txt')
-            output_text_path = os.path.join(output_path, out_file_txt)
-            extract_text_from_doc(input_file_path, output_text_path)
+            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
+            extracted_text = extract_text_from_doc(file_content)
+            save_to_s3(extracted_text, output_text_key)
+
         elif out_file.endswith('.txt'):
-            os.copy(input_file_path, os.path.join(output_path, out_file))
+            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file}"
+            save_to_s3(file_content, output_text_key)
+
         elif out_file.endswith('.epub'):
             out_file_txt = out_file.replace('.epub', '.txt')
-            output_text_path = os.path.join(output_path, out_file_txt)
-            extract_text_from_epub(input_file_path, output_text_path)
+            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
+            extracted_text = extract_text_from_epub(file_content)
+            save_to_s3(extracted_text, output_text_key)
 
 
 if __name__ == "__main__":

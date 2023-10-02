@@ -6,6 +6,43 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import openai
 import shutil
+import boto3
+
+
+# ========================================================
+# amazon adaptions
+# ========================================================
+
+
+s3 = boto3.client('s3', region_name='us-gov-west-1')
+
+BUCKET_NAME = "ocelot-data-input"
+IMPORT_SUBFOLDER = "Import"
+EXPORT_SUBFOLDER = "Export"
+
+
+def read_from_s3(file_key):
+    """Reads a file from S3 given its key."""
+    obj = s3.get_object(Bucket=BUCKET_NAME, Key=file_key)
+    content = obj['Body'].read().decode('utf-8')
+    return content
+
+
+def save_to_s3(data, file_key):
+    """Writes data to an S3 file given its key."""
+    s3.put_object(Body=data, Bucket=BUCKET_NAME, Key=file_key)
+
+
+def list_files_in_s3_subfolder(subfolder_name):
+    """Lists all files in a specific S3 subfolder."""
+    response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=subfolder_name)
+    return [item['Key'] for item in response.get('Contents', [])]
+
+
+# ========================================================
+# functions and main body
+# ========================================================
+
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -105,18 +142,24 @@ def load_checkpoint():
     return None, None
 
 
+# ========================================================
+# main function
+# ========================================================
+
 if __name__ == "__main__":
     # Define the directory where the textbooks are stored
-    directory_path = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess\Import_text'
+    import_directory_path = IMPORT_SUBFOLDER
 
     # Define a directory where the processed textbooks will be saved
-    export_directory = r'C:\Users\Deft\Desktop\Devlopment\Textbook-Preprocess\Export_text'
-    if not os.path.exists(export_directory):
+    export_directory_path = EXPORT_SUBFOLDER
+    if not os.path.exists(export_directory_path):
         # Create the directory if it doesn't exist
-        os.makedirs(export_directory)
+        os.makedirs(export_directory_path)
 
     # Read all textbooks
-    textbooks = read_all_textbooks(directory_path)
+    textbook_files = list_files_in_s3_subfolder(import_directory_path)
+    textbooks = {os.path.basename(file): read_from_s3(file)
+                 for file in textbook_files}
 
     # load the checkpoint
     checkpoint_title, checkpoint_chunk_index = load_checkpoint()
@@ -152,8 +195,10 @@ if __name__ == "__main__":
             outfile.write("==========\n\n")
 
         # After processing each textbook, move it to the export directory
-        shutil.move(output_filename, os.path.join(
-            export_directory, output_filename))
+        with open(output_filename, 'r', encoding='utf-8') as file:
+            content = file.read()
+        save_to_s3(content, os.path.join(
+            export_directory_path, output_filename))
 
     # After processing all books, delete the checkpoint (if it exists)
     if os.path.exists("checkpoint.txt"):
