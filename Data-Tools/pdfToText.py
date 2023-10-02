@@ -67,22 +67,6 @@ def remove_copyright_paragraphs(text):
     return re.sub(pattern, '', text, flags=re.DOTALL)
 
 
-def collect_files(folder_path, extensions):
-    """Collect files with given extensions from a folder."""
-    file_set = []
-    try:
-        for file in os.listdir(folder_path):
-            if file.endswith(tuple(extensions)):
-                full_name = os.path.join(folder_path, file)
-                file_name = os.path.basename(file)
-                file_set.append(
-                    {'full_name': full_name, 'file_name': file_name})
-    except OSError as err:
-        print("Error: {} - {}".format(err.filename, err.strerror))
-
-    return file_set
-
-
 def extract_text_from_pdf(pdf_path, output_path):
     if os.path.exists(output_path):
         print(f"{os.path.basename(pdf_path)} already processed. Skipping...")
@@ -177,7 +161,13 @@ def transform_with_ocr(input_filename):
 
 def lambda_handler(event, context):
     try:
-        main()
+        # Get the S3 file key from the event
+        s3_event = event['Records'][0]['s3']
+        file_key = s3_event['object']['key']
+
+        # Call main with the specific file key
+        main(file_key)
+
         return {
             'statusCode': 200,
             'body': json.dumps('Text extraction completed successfully!')
@@ -194,56 +184,41 @@ def lambda_handler(event, context):
 # ======================================
 
 
-def main():
-    # Get the list of all files in the IMPORT_SUBFOLDER on S3
-    file_collection = list_files_in_s3_subfolder(IMPORT_SUBFOLDER)
-
-    for file_key in file_collection:
-        # For simplicity, considering only the file's name (excluding the folder)
-        file_name = file_key.split('/')[-1]
-        out_file = file_name
-
-        # Use the read_from_s3 function to read file content
-        file_content = read_from_s3(file_key)
-
-        if out_file.endswith('.pdf'):
-            out_file_txt = out_file.replace('.pdf', '.txt')
-            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
-            extracted_text = extract_text_from_pdf(file_content)
-
-            # Checking word count and decide if to process with OCR
-            word_count = len(extracted_text.split())
-
-            if word_count < 100:
-                ocr_processed_file_content = transform_with_ocr(file_content)
-                extracted_text = extract_text_from_pdf(
-                    ocr_processed_file_content)
-
-            # Use save_to_s3 function to write back to S3
-            save_to_s3(extracted_text, output_text_key)
-
-        elif out_file.endswith('.docx'):
-            out_file_txt = out_file.replace('.docx', '.txt')
-            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
-            extracted_text = extract_text_from_word(file_content)
-            save_to_s3(extracted_text, output_text_key)
-
-        elif out_file.endswith('.doc'):
-            out_file_txt = out_file.replace('.doc', '.txt')
-            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
-            extracted_text = extract_text_from_doc(file_content)
-            save_to_s3(extracted_text, output_text_key)
-
-        elif out_file.endswith('.txt'):
-            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file}"
-            save_to_s3(file_content, output_text_key)
-
-        elif out_file.endswith('.epub'):
-            out_file_txt = out_file.replace('.epub', '.txt')
-            output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
-            extracted_text = extract_text_from_epub(file_content)
-            save_to_s3(extracted_text, output_text_key)
+FILE_PROCESSORS = {
+    '.pdf': extract_text_from_pdf,
+    '.docx': extract_text_from_word,
+    '.doc': extract_text_from_doc,
+    '.txt': lambda content: content,
+    '.epub': extract_text_from_epub
+}
 
 
-if __name__ == "__main__":
-    main()
+def main(file_key):
+    # excluding the folder name
+    file_name = file_key.split('/')[-1]
+    out_file = file_name
+
+    # Use the read_from_s3 function to read file content
+    file_content = read_from_s3(file_key)
+
+    # Identify the processor based on file extension
+    file_processor = FILE_PROCESSORS.get(os.path.splitext(out_file)[1])
+
+    if not file_processor:
+        print(f"No processor found for file: {out_file}")
+        return
+
+    extracted_text = file_processor(file_content)
+
+    # Special case for PDFs where we may use OCR
+    if out_file.endswith('.pdf'):
+        word_count = len(extracted_text.split())
+        if word_count < 100:
+            ocr_processed_file_content = transform_with_ocr(file_content)
+            extracted_text = file_processor(ocr_processed_file_content)
+
+    # Determine the output text file name
+    out_file_txt = os.path.splitext(out_file)[0] + '.txt'
+    output_text_key = f"{EXPORT_SUBFOLDER}/{out_file_txt}"
+
+    save_to_s3(extracted_text, output_text_key)
