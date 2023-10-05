@@ -206,11 +206,11 @@ def main():
 
     # Get list of documents tagged with import keys
     convert_list = s3_list(import_subfolder)
-    print(convert_list)
+    # print(convert_list)
 
     for document in convert_list:
         # Retrieve
-        print("Retrieving {document}")
+        print(f"Retrieving {document}")
         s3_get(document)
         # Convert
         # Identify the processor based on file extension
