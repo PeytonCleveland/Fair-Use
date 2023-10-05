@@ -1,6 +1,5 @@
 import os
 import time
-import pandas as pd
 import fitz
 import re
 import docx2txt
@@ -20,6 +19,8 @@ s3r = boto3.resource('s3', region_name='us-gov-west-1')
 bucket_name = "ocelot-data-input"
 import_subfolder = "Test/Import/"        # do not start with "/"
 export_subfolder = "Test/Export/"
+complete_subfolder = "Test/Complete/"
+
 
 def s3_list(file_path):
     keySet = []
@@ -38,14 +39,32 @@ def s3_get(file_key):
     s3c.download_file(bucket_name, file_key, file_name)
 
 
-# def s3_put():
+def s3_put(file_key):
     # Push text file to S3 bucket
+    file_name = file_key.split("/")[-1]
+    s3c.upload_file(file_name, bucket_name, file_key)
+
+
+def s3_set_complete(file_key):
+    # Update source file with completed tag
+    file_name = file_key.split("/")[-1]
+    completed_key = complete_subfolder + file_name
+    source_block = {
+        "Bucket": bucket_name,
+        "Key": file_key
+    }
+    try:
+        s3r.meta.client.copy(source_block, bucket_name, completed_key)
+        s3r.meta.client.delete_object(Bucket=bucket_name, Key=file_key)
+    except Exception as e:
+        print(f"Failed to move S3 objects because of {e}")
 
 
 
 # ======================================
-# Functions
+# Text Processing Functions
 # ======================================
+
 
 def set_file_processor(file_key):
     extension = os.path.splitext(file_key)[1]
@@ -122,7 +141,6 @@ def transform_with_ocr(file_key):
     return out_filename
 
 
-
 def extract_text_from_word(docx_path, output_path):
     if os.path.exists(output_path):
         print(f"{os.path.basename(docx_path)} already processed. Skipping...")
@@ -169,7 +187,6 @@ def extract_text_from_epub(epub_path, output_path):
         out.write(cleaned_text)
 
 
-
 def lambda_handler(event, context):
     try:
         # Get the S3 file key from the event
@@ -177,7 +194,7 @@ def lambda_handler(event, context):
         file_key = s3_event['object']['key']
 
         # Call main with the specific file key
-        main(file_key)
+        main()
 
         return {
             'statusCode': 200,
@@ -201,32 +218,40 @@ def main():
 
     # Control lists
     convert_list = []
-    success_list = []
-    failure_list = []
+    # success_list = []       # not sure this is a need for these
+    # failure_list = []
 
     # Get list of documents tagged with import keys
     convert_list = s3_list(import_subfolder)
     # print(convert_list)
 
-    for document in convert_list:
+    for document_key in convert_list:
         # Retrieve
-        print(f"Retrieving {document}")
-        s3_get(document)
+        print(f"Retrieving {document_key}")
+        s3_get(document_key)
+
         # Convert
         # Identify the processor based on file extension
-        file_processor = set_file_processor(document)
-        print(f"processor picked for {document}")
+        file_processor = set_file_processor(document_key)
+        print(f"processor picked for {document_key}")
         if not file_processor:
-            print(f"No processor found for file: {document}")
+            print(f"No processor found for file: {document_key}")
             return
 
-        text_filename = file_processor(document)
+        text_filename = file_processor(document_key)
         print(f"Created {text_filename}")
 
+        # Publish
+        upload_key = export_subfolder + text_filename
+        s3_put(upload_key)
+        print(f"Converted text file has been uploaded to the S3 location: {upload_key}")
 
+        # Clean up
+        s3_set_complete(document_key)
+        pdf_filename = document_key.split("/")[-1]
+        os.remove(pdf_filename)
+        os.remove(text_filename)
 
-    #   Publish
-    # save_to_s3(extracted_text, output_text_key)
 
 if __name__ == "__main__":
     main()
