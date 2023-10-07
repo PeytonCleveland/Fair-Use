@@ -55,9 +55,11 @@ def s3_set_complete(file_key):
     }
     try:
         s3r.meta.client.copy(source_block, bucket_name, completed_key)
-        s3r.meta.client.delete_object(Bucket=bucket_name, Key=file_key)
     except Exception as e:
-        print(f"Failed to move S3 objects because of {e}")
+        print(f"Failed to copy S3 objects because of {e}")
+    else:
+        s3r.meta.client.delete_object(Bucket=bucket_name, Key=file_key)
+
 
 
 
@@ -190,8 +192,8 @@ def extract_text_from_epub(epub_path, output_path):
 def lambda_handler(event, context):
     try:
         # Get the S3 file key from the event
-        s3_event = event['Records'][0]['s3']
-        file_key = s3_event['object']['key']
+        # s3_event = event['Records'][0]['s3']
+        # file_key = s3_event['object']['key']
 
         # Call main with the specific file key
         main()
