@@ -20,6 +20,7 @@ bucket_name = "ocelot-data-input"
 import_subfolder = "Test/Import/"        # do not start with "/"
 export_subfolder = "Test/Export/"
 complete_subfolder = "Test/Complete/"
+error_subfolder = "Test/Error/"
 
 
 def s3_list(file_path):
@@ -55,12 +56,28 @@ def s3_set_complete(file_key):
     }
     try:
         s3r.meta.client.copy(source_block, bucket_name, completed_key)
+        print(f"Document moved to completed directory: {completed_key}")
     except Exception as e:
         print(f"Failed to copy S3 objects because of {e}")
     else:
         s3r.meta.client.delete_object(Bucket=bucket_name, Key=file_key)
 
 
+def s3_set_error(file_key):
+    # Update source file with error tag
+    file_name = file_key.split("/")[-1]
+    error_key = error_subfolder + file_name
+    source_block = {
+        "Bucket": bucket_name,
+        "Key": file_key
+    }
+    try:
+        s3r.meta.client.copy(source_block, bucket_name, error_key)
+        print(f"Document moved to error directory: {error_key}")
+    except Exception as e:
+        print(f"Failed to copy S3 objects because of {e}")
+
+    return error_key
 
 
 # ======================================
@@ -139,7 +156,12 @@ def transform_with_ocr(file_key):
     # Extract the file name without extension and the directory
     pdf_name = file_key.split("/")[-1]
     out_filename = pdf_name.replace('.pdf','.txt')
-    run(['ocrmypdf', '--force-ocr', pdf_name, out_filename])
+    try:
+        run(['ocrmypdf', '--force-ocr', pdf_name, out_filename])
+    except Exception:
+            print(f"Error with OCR conversion of {file_key}")
+            out_filename = "ERROR"
+
     return out_filename
 
 
@@ -241,7 +263,12 @@ def main():
             return
 
         text_filename = file_processor(document_key)
-        print(f"Created {text_filename}")
+        if "ERROR" == text_filename:
+            print(f"Error processing file. Moving it to: {error_subfolder} ")
+            s3_set_error(document_key)
+        else:
+            print(f"Created {text_filename}")
+            s3_set_complete(document_key)
 
         # Publish
         upload_key = export_subfolder + text_filename
@@ -249,7 +276,6 @@ def main():
         print(f"Converted text file has been uploaded to the S3 location: {upload_key}")
 
         # Clean up
-        s3_set_complete(document_key)
         pdf_filename = document_key.split("/")[-1]
         os.remove(pdf_filename)
         os.remove(text_filename)
