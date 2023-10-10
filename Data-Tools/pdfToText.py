@@ -90,13 +90,20 @@ def set_file_processor(file_key):
 
     FILE_PROCESSORS = {
     '.pdf': extract_text_from_pdf,
-    '.docx': extract_text_from_word,
-    '.doc': extract_text_from_doc,
-    '.epub': extract_text_from_epub
+    # '.docx': extract_text_from_word,
+    '.docx': coming_soon,
+    # '.doc': extract_text_from_doc,
+    '.doc': coming_soon,
+    # '.epub': extract_text_from_epub
+    '.epub': coming_soon
     }
 
     fp = FILE_PROCESSORS.get(extension)
     return fp
+
+
+def coming_soon(file_key):
+    print(f"Document format is currently not processed.  Skipping {file_key}.")
 
 
 def clean_text(text):
@@ -164,6 +171,8 @@ def transform_with_ocr(file_key):
 
     return out_filename
 
+'''
+    # COMING SOON!
 
 def extract_text_from_word(docx_path, output_path):
     if os.path.exists(output_path):
@@ -194,10 +203,7 @@ def extract_text_from_doc(doc_path, output_path):
         print(f"Failed to process {os.path.basename(doc_path)}: {e}")
 
 
-def extract_text_from_epub(epub_path, output_path):
-    if os.path.exists(output_path):
-        print(f"{os.path.basename(epub_path)} already processed. Skipping...")
-        return
+def extract_text_from_epub(file_key):
 
     book = epub.read_epub(epub_path)
     text = ''
@@ -209,6 +215,8 @@ def extract_text_from_epub(epub_path, output_path):
     cleaned_text = clean_text(text)
     with open(output_path, "w", encoding="utf-8") as out:
         out.write(cleaned_text)
+
+'''
 
 
 def lambda_handler(event, context):
@@ -262,6 +270,7 @@ def main():
             print(f"No processor found for file: {document_key}")
             return
 
+        # Execute the file_processor, returns name of converted document unless error
         text_filename = file_processor(document_key)
         if "ERROR" == text_filename:
             print(f"Error processing file. Moving it to: {error_subfolder} ")
