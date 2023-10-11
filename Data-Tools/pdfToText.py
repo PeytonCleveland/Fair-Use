@@ -2,8 +2,8 @@ import os
 import time
 import fitz
 import re
-import docx2txt
-from ebooklib import epub
+# import docx2txt
+# from ebooklib import epub
 from subprocess import run
 import boto3
 import json
@@ -76,6 +76,8 @@ def s3_set_error(file_key):
         print(f"Document moved to error directory: {error_key}")
     except Exception as e:
         print(f"Failed to copy S3 objects because of {e}")
+    else:
+        s3r.meta.client.delete_object(Bucket=bucket_name, Key=file_key)
 
     return error_key
 
@@ -135,27 +137,32 @@ def remove_copyright_paragraphs(text):
 def extract_text_from_pdf(file_key):
     pdf_name = file_key.split("/")[-1]
     out_filename = pdf_name.replace('.pdf','.txt')
-    doc = fitz.open(pdf_name)
-    with open(out_filename, "wb") as out:
-        for page in doc:
-            try:
-                text = page.get_text()
-                cleaned_text = clean_text(text)
-                cleaned_text = remove_copyright_paragraphs(cleaned_text)
-                out.write(cleaned_text.encode("utf8"))
-                out.write(bytes((12,)))
-            except Exception:
-                print(f"Error processing page {page.number} of {pdf_path}")
-    doc.close()
+    try:
+        doc = fitz.open(pdf_name)
+        with open(out_filename, "wb") as out:
+            for page in doc:
+                try:
+                    text = page.get_text()
+                    cleaned_text = clean_text(text)
+                    cleaned_text = remove_copyright_paragraphs(cleaned_text)
+                    out.write(cleaned_text.encode("utf8"))
+                    out.write(bytes((12,)))
+                except Exception:
+                    print(f"Error processing page {page.number} of {pdf_path}")
+        doc.close()
+        # Test for successful conversion
+        test = open(out_filename, 'r')
+        textData = test.read()
+        word_count = len(textData.split())
+        if word_count < 100:
+            out_filename = transform_with_ocr(file_key)
 
-    # Test for successful conversion
-    test = open(out_filename, 'r')
-    textData = test.read()
-    word_count = len(textData.split())
-    if word_count < 100:
-        out_filename = transform_with_ocr(file_key)
+        return out_filename      # return file name for testing the file
 
-    return out_filename      # return file name for testing the file
+    except Exception as e:
+        print(f"File failed to open:  {e} ")
+        out_filename = "ERROR"
+        return out_filename      # return file name for testing the file
 
 
 def transform_with_ocr(file_key):
@@ -165,11 +172,13 @@ def transform_with_ocr(file_key):
     out_filename = pdf_name.replace('.pdf','.txt')
     try:
         run(['ocrmypdf', '--force-ocr', pdf_name, out_filename])
-    except Exception:
+    except Exception as e:
             print(f"Error with OCR conversion of {file_key}")
+            print(f"Error message: {e}")
             out_filename = "ERROR"
 
     return out_filename
+
 
 '''
     # COMING SOON!
@@ -204,7 +213,6 @@ def extract_text_from_doc(doc_path, output_path):
 
 
 def extract_text_from_epub(file_key):
-
     book = epub.read_epub(epub_path)
     text = ''
     for item in book.items:
@@ -240,9 +248,9 @@ def lambda_handler(event, context):
         }
 
 
-# ======================================
-# Main
-# ======================================
+# ==============================================
+# Main - Converting pdf documents to text files
+# ==============================================
 
 # A few variables are defined above in the S3 section
 
@@ -272,7 +280,7 @@ def main():
 
         # Execute the file_processor, returns name of converted document unless error
         text_filename = file_processor(document_key)
-        if "ERROR" == text_filename:
+        if text_filename ==  "ERROR" :
             print(f"Error processing file. Moving it to: {error_subfolder} ")
             s3_set_error(document_key)
         else:
@@ -280,14 +288,16 @@ def main():
             s3_set_complete(document_key)
 
         # Publish
-        upload_key = export_subfolder + text_filename
-        s3_put(upload_key)
-        print(f"Converted text file has been uploaded to the S3 location: {upload_key}")
+        if text_filename !=  "ERROR" :
+            upload_key = export_subfolder + text_filename
+            s3_put(upload_key)
+            print(f"Converted text file has been uploaded to the S3 location: {upload_key}")
 
         # Clean up
         pdf_filename = document_key.split("/")[-1]
         os.remove(pdf_filename)
-        os.remove(text_filename)
+        if text_filename !=  "ERROR" :
+            os.remove(text_filename)
 
 
 if __name__ == "__main__":
