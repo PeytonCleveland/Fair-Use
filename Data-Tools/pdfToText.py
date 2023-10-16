@@ -1,6 +1,14 @@
+# Python script for converting pdfs to txt files.
+#   S3 is used for all file storage.  Set input 
+#   and out put locations at the S3 Functions
+#   below.
+#
+#   D.Kuhl
+#======================================
+
 import os
 import time
-import fitz
+import fitz                     # PyMuPDF library
 import re
 # import docx2txt
 # from ebooklib import epub
@@ -17,10 +25,10 @@ s3c = boto3.client('s3', region_name='us-gov-west-1')
 s3r = boto3.resource('s3', region_name='us-gov-west-1')
 
 bucket_name = "ocelot-data-input"
-import_subfolder = "Test/Import/"        # do not start with "/"
-export_subfolder = "Test/Export/"
-complete_subfolder = "Test/Complete/"
-error_subfolder = "Test/Error/"
+import_subfolder = "Input/DFARS/"        # do not start with "/"
+complete_subfolder = "Input/DFARS/Completed/"
+export_subfolder = "Output/DFARS/"
+error_subfolder = "Error/"
 
 
 def s3_list(file_path):
@@ -113,15 +121,12 @@ def clean_text(text):
     text = text.replace('\f', '')
     text = re.sub(r'(\s*\.\s*){2,}', ' ', text)
     text = re.sub(r'_+', ' ', text)
-    text = re.sub(r'\b\d{1,4}\b', '', text)
     text = re.sub(r'http\S+', '', text)
     text = re.sub(r'(?i)this page intentionally left blank', '', text)
-    text = re.sub(
-        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', '', text)
-    text = re.sub(r'(\(?\d{3}\)?)?[\s|-]?\d{3}-\d{4}', ' XXX-XXX-XXXX ', text)      # phone numbers
-    text = re.sub('[\u00B9\|\u00B2\|\u00B3\|\u2074\|\u2075\|\u2076\|\u2077\|\u2078\|\u2079|\u2070]', '', text) # superscript 0-9
-
-
+    # text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', '', text)
+    # text = re.sub(r'(\(?\d{3}\)?)?[\s|-]?\d{3}-\d{4}', ' XXX-XXX-XXXX ', text)      # phone numbers
+    # text = re.sub('[\u00B9\|\u00B2\|\u00B3\|\u2074\|\u2075\|\u2076\|\u2077\|\u2078\|\u2079|\u2070]', '', text) # superscript 0-9
+    # text = re.sub(r'\b\d{1,4}\b', '', text)
     # Remove any excess spaces
     # text = re.sub(r'\s{2,}', ' ', text)
 

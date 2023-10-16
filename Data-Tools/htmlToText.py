@@ -1,5 +1,7 @@
-# Python script for downloading files (pdfs)
-#   from a list of urls
+# Python script for scraping text from 
+#   html based websites.  Input is a list
+#   of urls.
+#           INCOMPLETE
 #   D.Kuhl
 #======================================
 
@@ -8,7 +10,7 @@ import re
 import boto3
 import html2text        # add to requirements
 import requests
-import requests-html
+import requests_html
 import lxml.html
 
 
@@ -136,12 +138,12 @@ def remove_copyright_paragraphs(text):
 
 
 # ==============================================
-# Main - Converting pdf documents to text files
+# Main - Rendering html sites to text files
 # ==============================================
 
 # A few variables are defined above in the S3 section
 link_source_file = r"/home/da5id/OmniFed/pseudoBucket/htmlSets/far-data-links.txt"
-out_location = r"/home/da5id/OmniFed/pseudoBucket/htmlOutText/"
+out_location = r"/home/da5id/OmniFed/pseudoBucket/htmlSets/htmlOutText/"
 
 
 def main():
@@ -157,10 +159,6 @@ def main():
         text_raw = processor.handle(site)
         text_clean = clean_text(text_raw)
         out_path = out_location + out_filename
-
-
-
-
 
 
 
