@@ -25,9 +25,9 @@ s3c = boto3.client('s3', region_name='us-gov-west-1')
 s3r = boto3.resource('s3', region_name='us-gov-west-1')
 
 bucket_name = "ocelot-data-input"
-import_subfolder = "Input/DFARS/"        # do not start with "/"
-complete_subfolder = "Input/DFARS/Completed/"
-export_subfolder = "Output/DFARS/"
+import_subfolder = "Input/AF-Epub/36-personnel/"        # do not start with "/"
+complete_subfolder = "Input/AF-Epub/COMPLETED/36-personnel/"
+export_subfolder = "Output/AF-Epub/36-personnel/"
 error_subfolder = "Error/"
 
 
@@ -151,7 +151,8 @@ def extract_text_from_pdf(file_key):
                     cleaned_text = clean_text(text)
                     cleaned_text = remove_copyright_paragraphs(cleaned_text)
                     out.write(cleaned_text.encode("utf8"))
-                    out.write(bytes((12,)))
+                    # out.write(bytes((12,)))
+                    out.write(b'\n')
                 except Exception:
                     print(f"Error processing page {page.number} of {pdf_path}")
         doc.close()
